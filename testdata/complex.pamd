@@ -1,0 +1,26 @@
+# Complex PAM configuration demonstrating advanced features
+auth       required     pam_env.so
+auth       required     pam_faildelay.so     delay=2000000
+auth       [success=ok new_authtok_reqd=ok ignore=ignore user_unknown=bad default=die] pam_unix.so nullok
+auth       -optional    pam_gnome_keyring.so
+
+# Line continuation example
+auth       sufficient   pam_mysql.so user=pam passwd=secret \
+           host=localhost db=pam table=users \
+           query=SELECT user FROM users WHERE user='%u' AND password=PASSWORD('%p') \
+           crypt=1
+
+account    required     pam_unix.so
+account    -optional    pam_ldap.so
+
+password   requisite    pam_pwquality.so retry=3 minlen=8 dcredit=-1 ucredit=-1
+password   sufficient   pam_unix.so sha512 shadow nullok try_first_pass use_authtok
+password   -optional    pam_gnome_keyring.so
+
+session    required     pam_limits.so
+session    required     pam_unix.so
+session    -optional    pam_systemd.so
+session    -optional    pam_gnome_keyring.so auto_start
+
+# Include common session configuration
+session    include      common-session

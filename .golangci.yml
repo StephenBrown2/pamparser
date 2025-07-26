@@ -1,0 +1,92 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - copyloopvar # Detects loop variables that are copied
+    - dupl # Code duplication
+    - embeddedstructfieldcheck # Check for embedded struct fields
+    - errname # Check error variable names
+    - errorlint # Error handling conventions
+    - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions.
+    - gocritic # Comprehensive Go source code linter
+    - gocyclo # Cyclomatic complexity
+    - iface # Detect the incorrect use of interfaces, helping developers avoid interface pollution.
+    - intrange # Intrange is a linter to find places where for loops could make use of an integer range.
+    - ireturn # Accept Interfaces, Return Concrete Types.
+    - misspell # Spelling mistakes
+    - nestif # Detect nested if statements
+    - nilerr # Find nil error returns
+    - nolintlint # Check for unnecessary or incorrect use of //nolint comments
+    - prealloc # Slice preallocation
+    - revive # Fast, configurable, extensible Go linter
+    - unconvert # Remove unnecessary type conversions
+    - unparam # Unused function parameters
+    - whitespace # Whitespace formatting
+  settings:
+    govet:
+      enable-all: true
+    revive:
+      confidence: 0.8
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: confusing-naming
+        - name: confusing-results
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: defer
+        - name: dot-imports
+          arguments:
+            - allowedPackages:
+                - github.com/onsi/ginkgo
+                - github.com/onsi/ginkgo/extensions/table
+                - github.com/onsi/ginkgo/v2
+                - github.com/onsi/gomega
+                - github.com/onsi/gomega/gstruct
+        - name: duplicated-imports
+        - name: early-return
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: get-return
+        - name: identical-branches
+        - name: if-return
+        - name: import-shadowing
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: optimize-operands-order
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: string-of-int
+        - name: superfluous-else
+        - name: time-equal
+        - name: time-naming
+        - name: unchecked-type-assertion
+        - name: unexported-return
+        - name: unnecessary-stmt
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: use-any
+        - name: useless-break
+        - name: var-declaration
+        - name: var-naming
+        - name: waitgroup-by-value
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
+  fix: true
+formatters:
+  enable:
+    - gci # Import grouping
+    - gofumpt # Stricter gofmt

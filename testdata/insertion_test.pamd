@@ -1,0 +1,6 @@
+# Sample PAM configuration for testing insertion
+auth       required     pam_unix.so     nullok
+auth       sufficient   pam_ldap.so
+account    required     pam_unix.so
+session    required     pam_unix.so
+session    optional     pam_motd.so
