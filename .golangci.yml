@@ -41,6 +41,9 @@ linters:
               desc: use github.com/onsi/ginkgo/v2
     govet:
       enable-all: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     revive:
       confidence: 0.8
       severity: warning
