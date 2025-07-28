@@ -1,6 +1,7 @@
 package pamparser
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -49,13 +50,7 @@ session    required     pam_env.so readenv=1 envfile=/etc/default/locale user_re
 			includeCount++
 
 			// Check if this is one of the expected includes
-			found := false
-			for _, expected := range expectedIncludes {
-				if rule.DirectiveTarget == expected {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(expectedIncludes, rule.DirectiveTarget)
 			if !found {
 				t.Errorf("Unexpected include target: %s", rule.DirectiveTarget)
 			}

@@ -3,6 +3,7 @@ package pamparser
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -276,13 +277,7 @@ func (w *Writer) sortRulesByType(config *Config) {
 
 	// Add any rules with unknown types
 	for moduleType, rules := range typeGroups {
-		found := false
-		for _, knownType := range typeOrder {
-			if moduleType == knownType {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(typeOrder, moduleType)
 		if !found {
 			sortedRules = append(sortedRules, rules...)
 		}

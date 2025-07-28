@@ -1,6 +1,7 @@
 package pamparser
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -184,13 +185,7 @@ func TestEditor_UpdateArgument(t *testing.T) {
 	}
 
 	// Check that timeout was added
-	found := false
-	for _, arg := range rule.Arguments {
-		if arg == "timeout=30" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(rule.Arguments, "timeout=30")
 	if !found {
 		t.Errorf("timeout=30 argument not found")
 	}
@@ -485,13 +480,7 @@ func TestEditor_UpdateArgumentEdgeCases(t *testing.T) {
 		t.Errorf("Expected 2 arguments, got %d", len(config.Rules[0].Arguments))
 	}
 
-	found := false
-	for _, arg := range config.Rules[0].Arguments {
-		if arg == "newarg=newvalue" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(config.Rules[0].Arguments, "newarg=newvalue")
 	if !found {
 		t.Error("New argument not found")
 	}

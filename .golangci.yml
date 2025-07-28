@@ -8,6 +8,7 @@ linters:
   default: standard
   enable:
     - copyloopvar # Detects loop variables that are copied
+    - depguard # Detects unwanted dependencies in go.mod
     - dupl # Code duplication
     - embeddedstructfieldcheck # Check for embedded struct fields
     - errname # Check error variable names
@@ -28,6 +29,16 @@ linters:
     - unparam # Unused function parameters
     - whitespace # Whitespace formatting
   settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "math/rand$"
+              desc: use math/rand/v2
+            - pkg: "github.com/onsi/ginkgo$"
+              desc: use github.com/onsi/ginkgo/v2
+            - pkg: "github.com/onsi/ginkgo/extensions/table$"
+              desc: use github.com/onsi/ginkgo/v2
     govet:
       enable-all: true
     revive:
@@ -43,8 +54,6 @@ linters:
         - name: dot-imports
           arguments:
             - allowedPackages:
-                - github.com/onsi/ginkgo
-                - github.com/onsi/ginkgo/extensions/table
                 - github.com/onsi/ginkgo/v2
                 - github.com/onsi/gomega
                 - github.com/onsi/gomega/gstruct

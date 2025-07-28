@@ -3,6 +3,7 @@ package pamparser
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -413,13 +414,7 @@ func (e *Editor) SortRulesByType() {
 
 	// Add any rules with unknown types at the end
 	for moduleType, rules := range typeGroups {
-		found := false
-		for _, knownType := range typeOrder {
-			if moduleType == knownType {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(typeOrder, moduleType)
 		if !found {
 			sortedRules = append(sortedRules, rules...)
 		}
