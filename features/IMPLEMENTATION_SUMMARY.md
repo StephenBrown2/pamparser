@@ -126,7 +126,7 @@ A complete CLI tool (`pam-tool`) for working with PAM configurations:
 
 ## File Structure
 
-```
+```sh
 pamparser/
 ├── parser.go          # Core parsing logic
 ├── writer.go          # Output formatting with auto-grouping

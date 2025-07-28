@@ -11,17 +11,42 @@ import (
 
 // Writer handles writing PAM configurations to files
 type Writer struct {
-	// Configuration options
-	IndentSize    int
-	MaxLineLength int
+	// Line continuation settings
+	MaxLineLength      int
+	ContinuationIndent int
+
+	// Pretty formatting settings
+	PrettyFormat       bool
+	TypeColumnWidth    int
+	ControlColumnWidth int
+	ModuleColumnWidth  int
 }
 
 // NewWriter creates a new PAM configuration writer
 func NewWriter() *Writer {
 	return &Writer{
-		IndentSize:    0,
-		MaxLineLength: 80,
+		MaxLineLength:      100,
+		ContinuationIndent: 4,
+		// Pretty formatting defaults
+		PrettyFormat:       false,
+		TypeColumnWidth:    8,  // "password" is 8 chars
+		ControlColumnWidth: 12, // "[success=ok]" can be long
+		ModuleColumnWidth:  20, // "pam_unix.so" plus some buffer
 	}
+}
+
+// SetPrettyFormat enables/disables column-aligned formatting
+func (w *Writer) SetPrettyFormat(enabled bool) *Writer {
+	w.PrettyFormat = enabled
+	return w
+}
+
+// SetColumnWidths allows customizing column widths for pretty formatting
+func (w *Writer) SetColumnWidths(typeWidth, controlWidth, moduleWidth int) *Writer {
+	w.TypeColumnWidth = typeWidth
+	w.ControlColumnWidth = controlWidth
+	w.ModuleColumnWidth = moduleWidth
+	return w
 }
 
 // formatControl formats a Control structure back to string representation
@@ -94,57 +119,88 @@ func (w *Writer) formatArguments(args []string) string {
 
 // formatRule formats a single Rule back to string representation
 func (w *Writer) formatRule(rule Rule) string {
-	var parts []string
-
-	// Handle directives (e.g., @include)
 	if rule.IsDirective {
-		parts = append(parts, "@"+rule.DirectiveType)
-		if rule.DirectiveTarget != "" {
-			parts = append(parts, rule.DirectiveTarget)
-		}
+		// Directives don't use column formatting
+		line := "@" + rule.DirectiveType + " " + rule.DirectiveTarget
 
 		// Add arguments if present
 		if len(rule.Arguments) > 0 {
-			args := w.formatArguments(rule.Arguments)
-			parts = append(parts, args)
+			line += " " + w.formatArguments(rule.Arguments)
 		}
 
-		line := strings.Join(parts, " ")
-
-		// Add inline comment if present
 		if rule.Comment != "" {
 			line += " # " + rule.Comment
 		}
-
 		return line
 	}
 
-	// Handle regular PAM rules
-	// Add service if present (for /etc/pam.conf format)
+	var parts []string
+
+	// Service field (only for pam.conf format)
 	if rule.Service != "" {
 		parts = append(parts, rule.Service)
 	}
 
-	// Add type
-	parts = append(parts, string(rule.Type))
+	// Type
+	typeStr := string(rule.Type)
+	parts = append(parts, typeStr)
 
-	// Add control
-	parts = append(parts, w.formatControl(rule.Control))
+	// Control
+	controlStr := w.formatControl(rule.Control)
+	parts = append(parts, controlStr)
 
-	// Add module path
+	// Module path
 	parts = append(parts, rule.ModulePath)
 
-	// Add arguments
+	// Arguments
 	if len(rule.Arguments) > 0 {
-		args := w.formatArguments(rule.Arguments)
-		parts = append(parts, args)
+		argsStr := w.formatArguments(rule.Arguments)
+		parts = append(parts, argsStr)
 	}
 
-	line := strings.Join(parts, " ")
+	var line string
 
-	// Add inline comment if present
+	if w.PrettyFormat && rule.Service == "" { // Only for pam.d format
+		line = w.formatPrettyRule(typeStr, controlStr, rule.ModulePath, rule.Arguments)
+	} else {
+		line = strings.Join(parts, " ")
+	}
+
+	// Add comment
 	if rule.Comment != "" {
 		line += " # " + rule.Comment
+	}
+
+	return line
+}
+
+// formatPrettyRule formats a rule with column alignment (pam.d format only)
+func (w *Writer) formatPrettyRule(typeStr, controlStr, modulePath string, arguments []string) string {
+	// Calculate padding
+	typePadding := w.TypeColumnWidth - len(typeStr)
+	if typePadding < 1 {
+		typePadding = 1
+	}
+
+	controlPadding := w.ControlColumnWidth - len(controlStr)
+	if controlPadding < 1 {
+		controlPadding = 1
+	}
+
+	modulePadding := w.ModuleColumnWidth - len(modulePath)
+	if modulePadding < 1 {
+		modulePadding = 1
+	}
+
+	// Build the formatted line
+	line := typeStr + strings.Repeat(" ", typePadding) +
+		controlStr + strings.Repeat(" ", controlPadding) +
+		modulePath
+
+	// Add arguments if present
+	if len(arguments) > 0 {
+		argsStr := w.formatArguments(arguments)
+		line += strings.Repeat(" ", modulePadding) + argsStr
 	}
 
 	return line
@@ -158,6 +214,7 @@ func (w *Writer) handleLineContinuation(line string) []string {
 
 	var lines []string
 	remaining := line
+	indentStr := strings.Repeat(" ", w.ContinuationIndent)
 
 	for len(remaining) > w.MaxLineLength {
 		// Find a good break point (prefer breaking at spaces)
@@ -173,8 +230,11 @@ func (w *Writer) handleLineContinuation(line string) []string {
 		currentLine := strings.TrimSpace(remaining[:breakPoint]) + " \\"
 		lines = append(lines, currentLine)
 
-		// Continue with remaining text
+		// Continue with remaining text, adding indentation
 		remaining = strings.TrimSpace(remaining[breakPoint:])
+		if remaining != "" {
+			remaining = indentStr + remaining
+		}
 	}
 
 	// Add the final part
@@ -297,4 +357,54 @@ func (w *Writer) WriteString(config *Config) (string, error) {
 		return "", err
 	}
 	return builder.String(), nil
+}
+
+// AnalyzeAndSetColumnWidths analyzes the config and sets optimal column widths
+func (w *Writer) AnalyzeAndSetColumnWidths(config *Config) *Writer {
+	var maxTypeWidth, maxControlWidth, maxModuleWidth int
+
+	for _, rule := range config.Rules {
+		if rule.IsDirective || rule.Service != "" {
+			continue // Skip directives and pam.conf format rules
+		}
+
+		// Type width
+		typeLen := len(string(rule.Type))
+		if typeLen > maxTypeWidth {
+			maxTypeWidth = typeLen
+		}
+
+		// Control width
+		controlStr := w.formatControl(rule.Control)
+		if len(controlStr) > maxControlWidth {
+			maxControlWidth = len(controlStr)
+		}
+
+		// Module width
+		if len(rule.ModulePath) > maxModuleWidth {
+			maxModuleWidth = len(rule.ModulePath)
+		}
+	}
+
+	// Add some padding
+	w.TypeColumnWidth = maxTypeWidth + 2
+	w.ControlColumnWidth = maxControlWidth + 2
+	w.ModuleColumnWidth = maxModuleWidth + 2
+
+	return w
+}
+
+// WritePretty writes a PAM configuration with pretty column formatting
+func (w *Writer) WritePretty(config *Config, writer io.Writer) error {
+	// Enable pretty formatting and analyze column widths
+	w.SetPrettyFormat(true).AnalyzeAndSetColumnWidths(config)
+	return w.Write(config, writer)
+}
+
+// WritePrettyString returns a pretty-formatted PAM configuration as a string
+func (w *Writer) WritePrettyString(config *Config) (string, error) {
+	var buf strings.Builder
+	w.SetPrettyFormat(true).AnalyzeAndSetColumnWidths(config)
+	err := w.Write(config, &buf)
+	return buf.String(), err
 }

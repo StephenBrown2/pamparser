@@ -7,6 +7,7 @@ A comprehensive Go library for parsing, editing, and writing Linux PAM (Pluggabl
 - **Parse PAM configurations** from files, strings, or readers
 - **Edit configurations** programmatically with a fluent API
 - **Write configurations** back to files or strings
+- **Pretty formatting** with automatic column alignment for improved readability
 - **Validate configurations** for common issues
 - **Support both formats**: `/etc/pam.conf` and `/etc/pam.d/*`
 - **Handle complex control syntax** like `[success=ok default=bad]`
@@ -89,7 +90,135 @@ if err != nil {
     log.Fatal(err)
 }
 fmt.Print(output)
+
+// Write with pretty formatting for better readability
+prettyOutput, err := writer.WritePrettyString(config)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Pretty formatted output:")
+fmt.Print(prettyOutput)
 ```
+
+## Pretty Formatting
+
+The PAM parser includes a pretty formatting feature that automatically aligns columns for improved readability when writing PAM configuration files.
+
+### Basic Pretty Formatting
+
+```go
+import pp "github.com/StephenBrown2/pamparser"
+
+// Load a configuration
+fm := pp.NewFileManager()
+config, err := fm.LoadFromFile("/etc/pam.d/sshd")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Write with pretty formatting (auto-calculated column widths)
+writer := pp.NewWriter()
+prettyOutput, err := writer.WritePrettyString(config)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(prettyOutput)
+```
+
+**Output:**
+
+```bash
+# Standard formatting
+auth required pam_unix.so nullok
+account sufficient pam_ldap.so try_first_pass
+password optional pam_cracklib.so retry=3 minlen=8
+
+# Pretty formatting - aligned columns
+auth     required   pam_unix.so      nullok
+account  sufficient pam_ldap.so      try_first_pass
+password optional   pam_cracklib.so  retry=3 minlen=8
+```
+
+### Custom Column Widths
+
+You can specify custom column widths for consistent formatting across multiple files:
+
+```go
+writer := pp.NewWriter()
+
+// Set custom column widths: type=12, control=15, module=25
+prettyOutput, err := writer.
+    SetColumnWidths(12, 15, 25).
+    WritePrettyString(config)
+```
+
+### Automatic Width Analysis
+
+The writer can automatically analyze your configuration and set optimal column widths:
+
+```go
+writer := pp.NewWriter()
+
+// Analyze config and set optimal widths
+writer.AnalyzeAndSetColumnWidths(config)
+
+// Write with calculated widths
+prettyOutput, err := writer.WritePrettyString(config)
+```
+
+### Pretty Formatting Methods
+
+| Method | Description |
+|--------|-------------|
+| `WritePrettyString(config)` | Returns pretty-formatted string with auto-calculated widths |
+| `WritePretty(config, writer)` | Writes pretty-formatted output to an io.Writer |
+| `SetPrettyFormat(true)` | Enables pretty formatting for subsequent writes |
+| `SetColumnWidths(type, control, module)` | Sets custom column widths |
+| `AnalyzeAndSetColumnWidths(config)` | Auto-calculates optimal column widths |
+
+### Method Chaining
+
+The writer supports method chaining for fluent configuration:
+
+```go
+output, err := pp.NewWriter().
+    SetPrettyFormat(true).
+    SetColumnWidths(10, 12, 20).
+    WriteString(config)
+```
+
+### Pretty Formatting Features
+
+- **Automatic column alignment**: Type, control, and module path columns are properly aligned
+- **Indented continuations**: Long lines are wrapped with `\` and continuation lines are indented for clarity
+- **Preserves functionality**: Comments, arguments, and special formatting are maintained
+- **Handles edge cases**: Directives, optional controls, and negative module types work correctly
+- **pam.d format only**: Pretty formatting is only applied to pam.d format files (no service column)
+- **Customizable**: Column widths can be manually specified or automatically calculated
+
+### Example: Before and After
+
+**Standard formatting:**
+
+```bash
+auth required pam_unix.so nullok
+account sufficient pam_ldap.so try_first_pass use_authtok
+password [success=1 default=ignore] pam_cracklib.so retry=3 minlen=8
+session optional pam_systemd.so
+-session optional pam_keyinit.so force revoke
+```
+
+**Pretty formatting:**
+
+```bash
+auth     required                   pam_unix.so      nullok
+account  sufficient                 pam_ldap.so      try_first_pass use_authtok
+password [success=1 default=ignore] pam_cracklib.so  retry=3 minlen=8
+session  optional                   pam_systemd.so
+-session optional                   pam_keyinit.so   force revoke
+```
+
+*Note: Long lines are automatically wrapped with `\` continuation markers, and continuation lines are indented for clarity.*
 
 ## Core Types
 
@@ -126,10 +255,11 @@ type Control struct {
 
 ```go
 const (
-    ModuleTypeAccount  ModuleType = "account"
-    ModuleTypeAuth     ModuleType = "auth"
-    ModuleTypePassword ModuleType = "password"
-    ModuleTypeSession  ModuleType = "session"
+    ModuleTypeAccount               ModuleType = "account"
+    ModuleTypeAuth                  ModuleType = "auth"
+    ModuleTypePassword              ModuleType = "password"
+    ModuleTypeSession               ModuleType = "session"
+    ModuleTypeSessionNoninteractive ModuleType = "session-noninteractive"
 )
 ```
 
@@ -331,12 +461,13 @@ service type control module-path module-arguments
 type control module-path module-arguments
 ```
 
-### Module Types
+### PAM Module Types
 
 - `auth` - Authentication and credential granting
 - `account` - Account management and access control
 - `password` - Password/authentication token update
 - `session` - Session management
+- `session-noninteractive` - Non-interactive session management
 
 ### Control Values
 
@@ -371,7 +502,7 @@ type control module-path module-arguments
 
 ### Line Continuation
 
-Use backslash `\` at end of line:
+Use backslash `\` at end of line. Continuation lines are automatically indented:
 
 ```pam
 auth required pam_mysql.so user=test passwd=secret \
